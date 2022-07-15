@@ -1,0 +1,6 @@
+**/*.pkl
+scikit_learn_data/
+.*
+!.gitignore
+**/*.pyc
+**/__pycache__

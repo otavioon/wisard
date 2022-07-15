@@ -1,0 +1,25 @@
+# Other tools
+ipywidgets
+seaborn
+umap-learn
+pydot
+nodejs
+black
+isort
+pylantern
+plotly
+
+# Jupyter lab extensions
+jupyterlab
+jupyterlab-git
+jupyterthemes
+jupyterlab-code-formatter
+theme-darcula
+jupyterlab_theme_solarized_dark
+jupyterlab-drawio
+jupyterlab_execute_time
+jupyterlab-system-monitor
+jupyter-dash
+lckr-jupyterlab-variableinspector
+jupyterlab-lsp
+python-lsp-server[all]
