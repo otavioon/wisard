@@ -23,3 +23,4 @@ jupyter-dash
 lckr-jupyterlab-variableinspector
 jupyterlab-lsp
 python-lsp-server[all]
+jupyterlab-nvdashboard

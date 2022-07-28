@@ -1,12 +1,14 @@
 from os import urandom
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 from numba import jit
 import tqdm
+from tqdm.contrib.concurrent import process_map
 
 from .lut import LUT
 from .bloom_filter import generate_h3_values, BloomFilter
+
 
 # Converts a vector of booleans to an unsigned integer
 #  i.e. (2**0 * xv[0]) + (2**1 * xv[1]) + ... + (2**n * xv[n])
@@ -20,9 +22,11 @@ def input_to_value(xv: np.ndarray):
         result += xv[i] << i
     return result
 
+
 @jit(nopython=True, inline='always')
 def int_to_binary_list(value: int, size: int = 16):
     return [(value >> i) % 2 for i in range(size)]
+
 
 # Implementes a single discriminator in the WiSARD model
 # A discriminator is a collection of boolean LUTs with associated input sets
@@ -35,16 +39,21 @@ class Discriminator:
     #  unit_entries:  The size of the underlying storage arrays for the filters. Must be a power of two.
     #  unit_hashes:   The number of hash functions for each filter.
     #  random_values: If provided, is used to set the random hash seeds for all filters. Otherwise, each filter generates its own seeds.
-    def __init__(self, num_inputs, unit_inputs, unit_entries,
-                 unit_hashes, random_values=None, use_hashing=False):
-        assert((num_inputs/unit_inputs).is_integer())
+    def __init__(self,
+                 num_inputs,
+                 unit_inputs,
+                 unit_entries,
+                 unit_hashes,
+                 random_values=None,
+                 use_hashing=False):
+        assert ((num_inputs / unit_inputs).is_integer())
         self.num_filters = num_inputs // unit_inputs
         self.unit_inputs = unit_inputs
         self.use_hashing = use_hashing
         if use_hashing:
             self.filters = [
-                BloomFilter(unit_inputs, unit_entries, unit_hashes, random_values) 
-                for i in range(self.num_filters)
+                BloomFilter(unit_inputs, unit_entries, unit_hashes,
+                            random_values) for i in range(self.num_filters)
             ]
         else:
             self.filters = [LUT(unit_inputs) for i in range(self.num_filters)]
@@ -53,7 +62,8 @@ class Discriminator:
     # Inputs:
     #  xv: A vector of boolean values representing the input sample
     def train(self, xv):
-        filter_inputs = xv.reshape(self.num_filters, -1)  # Divide the inputs between the filters
+        filter_inputs = xv.reshape(self.num_filters,
+                                   -1)  # Divide the inputs between the filters
         for idx, inp in enumerate(filter_inputs):
             # inp_val = input_to_value(inp)
             self.filters[idx].add_member(inp)
@@ -63,11 +73,13 @@ class Discriminator:
     #  xv: A vector of boolean values representing the input sample
     # Returns: The response of the discriminator to the input
     def predict(self, xv, soft_error_rate=0.0):
-        filter_inputs = xv.reshape(self.num_filters, -1)  # Divide the inputs between the filters
+        filter_inputs = xv.reshape(self.num_filters,
+                                   -1)  # Divide the inputs between the filters
         response = 0
         for idx, inp in enumerate(filter_inputs):
             # inp_val = input_to_value(inp)
-            response += int(self.filters[idx].check_membership(inp,soft_error_rate))
+            response += int(self.filters[idx].check_membership(
+                inp, soft_error_rate))
         return response
 
     # Sets the bleaching value for all filters
@@ -95,21 +107,26 @@ class Discriminator:
         for f in self.filters:
             f.uncorrupt()
 
-    def mental_image(self, input_idxs):
-        img = np.zeros(self.num_filters*self.unit_inputs)
+    def mental_image(self, input_idxs) -> Tuple[np.ndarray, np.ndarray]:
+        img_0s = np.zeros(self.num_filters * self.unit_inputs)
+        img_1s = np.zeros(self.num_filters * self.unit_inputs)
 
         if self.use_hashing:
             raise NotImplementedError
 
         for i, f in enumerate(self.filters):
-            indexes = input_idxs[self.unit_inputs*i : self.unit_inputs*(i+1)]
+            indexes = input_idxs[self.unit_inputs * i:self.unit_inputs *
+                                 (i + 1)]
             for address in range(f.data.size):
                 bin_address = int_to_binary_list(address, size=self.unit_inputs)
                 if f.data[address] != 0:
                     for k in range(self.unit_inputs):
                         if bin_address[k] != 0:
-                            img[indexes[k]] += f.data[address]
-        return img
+                            img_1s[indexes[k]] += f.data[address]
+                        else:
+                            img_0s[indexes[k]] += f.data[address]
+                            
+        return img_0s, img_1s
 
 
 # Top-level class for the WiSARD weightless neural network model
@@ -122,27 +139,37 @@ class WiSARD:
     #  unit_entries:     The size of the underlying storage arrays for the filters. Must be a power of two.
     #  unit_hashes:      The number of hash functions for each filter.
     #  input_idxs:       If provided, supplies the indices of the input which should be used; this allows inputs to be used multiple times or not at all.
-    #  shared_rand_vals: If true, use the same random hash seeds for all filters in the model. There doesn't seem to be any reason not to do this. 
-    def __init__(self, num_inputs, num_classes, unit_inputs, unit_entries, unit_hashes, input_idxs=None, shared_rand_vals=True, randomize: bool = True):
-        self.pad_zeros = (((num_inputs // unit_inputs) * unit_inputs) - num_inputs) % unit_inputs
+    #  shared_rand_vals: If true, use the same random hash seeds for all filters in the model. There doesn't seem to be any reason not to do this.
+    def __init__(self,
+                 num_inputs,
+                 num_classes,
+                 unit_inputs,
+                 unit_entries,
+                 unit_hashes,
+                 input_idxs=None,
+                 shared_rand_vals=True,
+                 randomize: bool = True):
+        self.pad_zeros = (((num_inputs // unit_inputs) * unit_inputs) -
+                          num_inputs) % unit_inputs
         pad_inputs = num_inputs + self.pad_zeros
         if input_idxs is None:
-            self.input_order = np.arange(pad_inputs) # Use each input exactly once
+            self.input_order = np.arange(
+                pad_inputs)  # Use each input exactly once
         else:
             self.input_order = input_idxs
 
         if randomize:
             np.random.seed(int.from_bytes(urandom(4), "little"))
-            np.random.shuffle(self.input_order) # Randomize the ordering of the inputs
+            np.random.shuffle(
+                self.input_order)  # Randomize the ordering of the inputs
 
         random_values = generate_h3_values(
             unit_inputs, unit_entries, unit_hashes) if shared_rand_vals \
             else None  # Generate hash seeds, if desired
 
         self.discriminators = [
-            Discriminator(
-                self.input_order.size, unit_inputs, unit_entries,
-                unit_hashes, random_values)
+            Discriminator(self.input_order.size, unit_inputs, unit_entries,
+                          unit_hashes, random_values)
             for i in range(num_classes)
         ]
 
@@ -160,12 +187,12 @@ class WiSARD:
     # Returns: A vector containing the indices of the discriminators with maximal response
     def predict(self, xv, soft_error_rate=0.0):
         if (soft_error_rate > 0.0):
-            assert(self.discriminators[0].filters[0].bleach[...] == 1)  # Unsupported for other values
+            assert (self.discriminators[0].filters[0].bleach[...] == 1
+                   )  # Unsupported for other values
         xv = np.pad(xv, (0, self.pad_zeros))[self.input_order]  # Reorder input
         responses = np.array(
-            [d.predict(xv, soft_error_rate) for d in self.discriminators], 
-            dtype=int
-        )
+            [d.predict(xv, soft_error_rate) for d in self.discriminators],
+            dtype=int)
         max_response = responses.max()
         return np.where(responses == max_response)[0]
 
@@ -185,22 +212,57 @@ class WiSARD:
 
     # Corrupts all filters; this process is reversible using "uncorrupt"
     def corrupt(self, persistent_error_rate):
-        assert(self.discriminators[0].filters[0].bleach[...] == 1)  # Unsupported for other values
+        assert (self.discriminators[0].filters[0].bleach[...] == 1
+               )  # Unsupported for other values
         for d in self.discriminators:
             d.corrupt(persistent_error_rate)
 
     # Reverts data corrupted using the "corrupt" function
     def uncorrupt(self):
-        assert(self.discriminators[0].filters[0].bleach[...] == 1)  # Unsupported for other values
+        assert (self.discriminators[0].filters[0].bleach[...] == 1
+               )  # Unsupported for other values
         for d in self.discriminators:
             d.uncorrupt()
 
     def __do_extract_mental_image(self, discriminator_no):
-        return {discriminator_no: self.discriminators[discriminator_no].mental_image(self.input_order)}
+        return (discriminator_no,
+                self.discriminators[discriminator_no].mental_image(
+                    self.input_order))
 
-    def mental_images(self, discriminators_no: List[int] = None, mode: str = "normal", workers: int = None):
+    def mental_images(self,
+                      discriminators_no: List[int] = None,
+                      mode: str = "normal",
+                      workers: int = None):
         discriminators_no = discriminators_no or range(len(self.discriminators))
         return [
             self.discriminators[d_no].mental_image(self.input_order)
-            for d_no in tqdm.tqdm(discriminators_no, desc="Extracting mental images")
+            for d_no in tqdm.tqdm(discriminators_no,
+                                  desc="Extracting mental images")
         ]
+
+
+#     @staticmethod
+#     def _do_extract_mental_image(self, args):
+#         d_no = args[0]
+#         discriminator = args[1]
+#         input_order = args[2]
+
+#         return (d_no, discriminator.mental_image(input_order))
+
+#     def mental_images(self,
+#                       discriminators_no: List[int] = None,
+#                       mode: str = "normal",
+#                       workers: int = None):
+#         discriminators_no = discriminators_no or range(len(self.discriminators))
+#         args = [(d_no, self.discriminators[d_no], self.input_order)
+#                 for d_no in discriminators_no]
+#         values = process_map(self._do_extract_mental_image,
+#                              args,
+#                              desc="Extracting mental images",
+#                              max_workers=workers)
+#         return [
+#             val[1]
+#             for d_no in discriminators_no
+#             for val in values
+#             if val[0] == d_no
+#         ]
