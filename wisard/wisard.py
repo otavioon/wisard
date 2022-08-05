@@ -4,7 +4,6 @@ from typing import List, Tuple
 import numpy as np
 from numba import jit
 import tqdm
-from tqdm.contrib.concurrent import process_map
 
 from .lut import LUT
 from .bloom_filter import generate_h3_values, BloomFilter
@@ -125,8 +124,11 @@ class Discriminator:
                             img_1s[indexes[k]] += f.data[address]
                         else:
                             img_0s[indexes[k]] += f.data[address]
-                            
+
         return img_0s, img_1s
+
+    def max_bleach(self):
+        return max(f.data.max() for f in self.filters)
 
 
 # Top-level class for the WiSARD weightless neural network model
@@ -176,7 +178,7 @@ class WiSARD:
     # Performs a training step (updating filter values) for all discriminators
     # Inputs:
     #  xv: A vector of boolean values representing the input sample
-    def train(self, xv, label):
+    def train_sample(self, xv, label):
         xv = np.pad(xv, (0, self.pad_zeros))[self.input_order]  # Reorder input
         self.discriminators[label].train(xv)
 
@@ -185,7 +187,7 @@ class WiSARD:
     # Inputs:
     #  xv: A vector of boolean values representing the input sample
     # Returns: A vector containing the indices of the discriminators with maximal response
-    def predict(self, xv, soft_error_rate=0.0):
+    def predict_sample(self, xv, soft_error_rate=0.0):
         if (soft_error_rate > 0.0):
             assert (self.discriminators[0].filters[0].bleach[...] == 1
                    )  # Unsupported for other values
@@ -240,29 +242,54 @@ class WiSARD:
                                   desc="Extracting mental images")
         ]
 
+    def fit(self, X: np.ndarray, y: np.ndarray, use_tqdm: bool = True):
+        it = range(len(X))
+        if use_tqdm:
+            it = tqdm.tqdm(it,
+                           total=len(X),
+                           desc="Training model",
+                           leave=True,
+                           position=0)
+        for i in it:
+            self.train_sample(X[i], y[i])
 
-#     @staticmethod
-#     def _do_extract_mental_image(self, args):
-#         d_no = args[0]
-#         discriminator = args[1]
-#         input_order = args[2]
+    def predict(self,
+                X: np.ndarray,
+                y: np.ndarray,
+                use_tqdm: bool = True,
+                bleach: int = 1):
+        self.set_bleaching(bleach)
+        if use_tqdm:
+            X = tqdm.tqdm(X,
+                          desc="Evaluating model",
+                          total=len(X),
+                          leave=True,
+                          position=0)
+        y_pred = [self.predict_sample(x) for x in X]
+        return y_pred
 
-#         return (d_no, discriminator.mental_image(input_order))
+    def max_bleach(self):
+        return max(d.max_bleach() for d in self.discriminators)
 
-#     def mental_images(self,
-#                       discriminators_no: List[int] = None,
-#                       mode: str = "normal",
-#                       workers: int = None):
-#         discriminators_no = discriminators_no or range(len(self.discriminators))
-#         args = [(d_no, self.discriminators[d_no], self.input_order)
-#                 for d_no in discriminators_no]
-#         values = process_map(self._do_extract_mental_image,
-#                              args,
-#                              desc="Extracting mental images",
-#                              max_workers=workers)
-#         return [
-#             val[1]
-#             for d_no in discriminators_no
-#             for val in values
-#             if val[0] == d_no
-#         ]
+
+def model_from_coded_mental_image(model, coded_images_0s, coded_images_1s):
+    for d_no, (mental_img_0,
+               mental_img_1) in enumerate(zip(coded_images_0s,
+                                              coded_images_1s)):
+        num_filters = model.discriminators[d_no].num_filters
+        img_0 = mental_img_0[model.input_order].reshape(num_filters, -1)
+        img_1 = mental_img_1[model.input_order].reshape(num_filters, -1)
+
+        for f_no, ram_value in enumerate(img_1):
+            original_ram_value = ram_value.copy()
+            bin_addresses = np.asarray(int_to_binary_list(2**len(ram_value) -
+                                                          1))
+            for i in reversed(range(len(ram_value))):
+                if ram_value[i] > 0:
+                    model.discriminators[d_no].filters[f_no].add_member(
+                        bin_addresses, ram_value[i])
+                    for j in reversed(range(i)):
+                        ram_value[j] -= ram_value[i]
+                bin_addresses[i] = 0
+            model.discriminators[d_no].filters[f_no].add_member(
+                bin_addresses, img_0[f_no][0])

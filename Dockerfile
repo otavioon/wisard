@@ -44,7 +44,6 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 
     $PIP_INSTALL \
         numpy \
-        scipy \
         pandas \
         cloudpickle \
         scikit-image>=0.14.2 \
@@ -62,6 +61,15 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     $PIP_INSTALL \
         jupyter \
         jupyterlab \
+        && \
+        
+# ==================================================================
+# DL libs
+# ------------------------------------------------------------------
+
+    $PIP_INSTALL \
+        tensorflow \
+        keras \
         && \
 
 # ==================================================================
