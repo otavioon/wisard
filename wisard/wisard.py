@@ -143,12 +143,12 @@ class WiSARD:
     #  input_idxs:       If provided, supplies the indices of the input which should be used; this allows inputs to be used multiple times or not at all.
     #  shared_rand_vals: If true, use the same random hash seeds for all filters in the model. There doesn't seem to be any reason not to do this.
     def __init__(self,
-                 num_inputs,
-                 num_classes,
-                 unit_inputs,
-                 unit_entries,
-                 unit_hashes,
-                 input_idxs=None,
+                 num_inputs: int,
+                 num_classes: int,
+                 unit_inputs: int = 1,
+                 unit_entries: int = 1,
+                 unit_hashes: int = 1,
+                 input_idxs: List[int] = None,
                  shared_rand_vals=True,
                  randomize: bool = True):
         self.pad_zeros = (((num_inputs // unit_inputs) * unit_inputs) -
@@ -161,7 +161,6 @@ class WiSARD:
             self.input_order = input_idxs
 
         if randomize:
-            np.random.seed(int.from_bytes(urandom(4), "little"))
             np.random.shuffle(
                 self.input_order)  # Randomize the ordering of the inputs
 
