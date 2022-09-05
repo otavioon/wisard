@@ -5,6 +5,7 @@ import numpy as np
 from numba import jit
 import tqdm
 
+from .dict_filter import DictLUT
 from .lut import LUT
 from .bloom_filter import generate_h3_values, BloomFilter
 
@@ -44,8 +45,10 @@ class Discriminator:
                  unit_entries,
                  unit_hashes,
                  random_values=None,
-                 use_hashing=False):
+                 use_hashing=False,
+                 use_dict: bool = False):
         assert ((num_inputs / unit_inputs).is_integer())
+        self.use_dict = use_dict
         self.num_filters = num_inputs // unit_inputs
         self.unit_inputs = unit_inputs
         self.use_hashing = use_hashing
@@ -54,8 +57,11 @@ class Discriminator:
                 BloomFilter(unit_inputs, unit_entries, unit_hashes,
                             random_values) for i in range(self.num_filters)
             ]
-        else:
+        elif use_hashing:
             self.filters = [LUT(unit_inputs) for i in range(self.num_filters)]
+        else:
+            print("Instantiating DICT LUT")
+            self.filters = [DictLUT(unit_inputs) for i in range(self.num_filters)]
 
     # Performs a training step (updating filter values)
     # Inputs:
@@ -128,7 +134,10 @@ class Discriminator:
         return img_0s, img_1s
 
     def max_bleach(self):
-        return max(f.data.max() for f in self.filters)
+        if self.use_dict:
+            return max(max(list(f.d.values())) for f in self.filters)
+        else:
+            return max(f.data.max() for f in self.filters)
 
 
 # Top-level class for the WiSARD weightless neural network model
@@ -150,7 +159,8 @@ class WiSARD:
                  unit_hashes: int = 1,
                  input_idxs: List[int] = None,
                  shared_rand_vals=True,
-                 randomize: bool = True):
+                 randomize: bool = True,
+                 use_dict: bool = False):
         self.pad_zeros = (((num_inputs // unit_inputs) * unit_inputs) -
                           num_inputs) % unit_inputs
         pad_inputs = num_inputs + self.pad_zeros
@@ -170,7 +180,7 @@ class WiSARD:
 
         self.discriminators = [
             Discriminator(self.input_order.size, unit_inputs, unit_entries,
-                          unit_hashes, random_values)
+                          unit_hashes, random_values, use_dict=use_dict)
             for i in range(num_classes)
         ]
 

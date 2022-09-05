@@ -7,7 +7,7 @@
 # jupyterlab    latest (pip)
 # ==================================================================
 
-FROM python:3.9.13
+FROM ubuntu:20.04
 ENV LANG C.UTF-8
 RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
@@ -36,6 +36,8 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
         cmake \
         xdot \
         nodejs \
+	python-is-python3 \
+	python3-pip \
         && \
 
 # ==================================================================
