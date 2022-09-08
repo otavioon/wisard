@@ -226,8 +226,6 @@ if __name__ == "__main__":
 
     with dataset_path.open("rb") as f:
         (x_train, y_train), (x_test, y_test) = pickle.load(f)
-        x_train, y_train = x_train, y_train
-        x_test, y_test = x_test, y_test[:100]
 
     if args.seed is not None:
         random.seed(args.seed)
