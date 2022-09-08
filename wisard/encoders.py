@@ -1,8 +1,9 @@
 import numpy as np
+import pandas as pd
 import tqdm
 import struct
-from numba import njit
 import numbers
+from numba import njit, jit
 
 
 @njit
@@ -11,6 +12,11 @@ def index(array, item):
         if val == item:
             return idx
     return None
+
+
+@jit(nopython=True, inline='always')
+def int_to_binary_list(value: int, size: int):
+    return [(value >> i) % 2 for i in range(size)]
 
 
 class Encoder:
@@ -124,6 +130,53 @@ class CircularThermometerEncoder(Encoder, Decoder):
 
         return np.asarray(
             [self.decode(pattern[..., i]) for i in range(pattern.shape[-1])])
+
+
+class DistributiveThermometerEncoder(Encoder):
+    def __init__(self, resolution: int):
+        self.resolution = resolution
+        self.quantiles = []
+        self.encoding = {
+            bucket: np.array(
+                int_to_binary_list((2**bucket) - 1, size=self.resolution)
+            ).astype(np.uint8)
+            for bucket in range(self.resolution + 1)
+        }
+
+    def fit(self, X, y=None):
+        res_min = self.resolution
+        res_max = self.resolution * 10
+        last_q = 0
+
+        while res_min < res_max:
+            q = (res_max + res_min) // 2
+            result = pd.qcut(X.ravel(), q=q, duplicates="drop")
+            size = len(result.categories)
+            # print(f"q: {q}, size: {size}, min: {res_min}, max: {res_max}")
+
+            if size == self.resolution:
+                self.quantiles = [x.right for x in result.categories]
+                return self
+
+            if size > self.resolution:
+                res_max = q
+            else:
+                res_min = q
+
+            # Not needed
+            if last_q == q:
+                break
+            else:
+                last_q = q
+
+        raise ValueError("Could not find split")
+
+    def encode(self, X):
+        inds = np.digitize(X.ravel(), self.quantiles, right=False)
+        coded_x = [
+            np.expand_dims(self.encoding[i], axis=1).astype(np.uint8) for i in inds
+        ]
+        return np.hstack(coded_x).ravel()
 
 
 class FloatBinaryEncoder(Encoder, Decoder):

@@ -24,7 +24,7 @@ def input_to_value(xv: np.ndarray):
 
 
 @jit(nopython=True, inline='always')
-def int_to_binary_list(value: int, size: int = 16):
+def int_to_binary_list(value: int, size: int):
     return [(value >> i) % 2 for i in range(size)]
 
 
@@ -60,7 +60,6 @@ class Discriminator:
         elif use_hashing:
             self.filters = [LUT(unit_inputs) for i in range(self.num_filters)]
         else:
-            print("Instantiating DICT LUT")
             self.filters = [DictLUT(unit_inputs) for i in range(self.num_filters)]
 
     # Performs a training step (updating filter values)
@@ -281,6 +280,7 @@ class WiSARD:
         return max(d.max_bleach() for d in self.discriminators)
 
 
+# TODO: must inform the int_to_binaty_list size parameter based on encoding
 def model_from_coded_mental_image(model, coded_images_0s, coded_images_1s):
     for d_no, (mental_img_0,
                mental_img_1) in enumerate(zip(coded_images_0s,

@@ -2,7 +2,7 @@
 
 source vars.sh
 
-$CONTAINER_CMD run --gpus all -it --rm \
+$CONTAINER_CMD run -it --rm \
   --env HOME=$WORKDIR \
   --env SHELL="/bin/bash" \
   --publish $JUPYTER_PORT:$JUPYTER_PORT \
