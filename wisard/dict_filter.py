@@ -11,21 +11,23 @@ class DictLUT(Filter):
         self.num_inputs = num_inputs
         self.bleach = 1
         self.d = Dict.empty(
-            key_type=numba.core.types.int64,
+            key_type=numba.core.types.string,
             value_type=numba.core.types.int64
         )
 
     @staticmethod
     @jit(nopython=True)
     def __check_membership(xv, bleach, data):
-        address = (xv.astype(np.int64) * 2**np.arange(xv.size)).sum()
+        # address = (xv.astype(np.int64) * 2**np.arange(xv.size)).sum()
+        address = "".join(["0" if x==0 else "1" for x in xv])
         val = data.get(address, 0)
         return val >= bleach
 
     @staticmethod
     @jit(nopython=True)
     def __add_member(xv, data, inc_val):
-        address = (xv.astype(np.int64) * 2**np.arange(xv.size)).sum()
+        # address = (xv.astype(np.int64) * 2**np.arange(xv.size)).sum()
+        address = "".join(["0" if x==0 else "1" for x in xv])
         if address not in data:
             data[address] = inc_val
         else:
