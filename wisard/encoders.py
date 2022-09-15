@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import tqdm
+import logging
 import struct
 import numbers
 from numba import njit, jit
@@ -154,7 +155,7 @@ class DistributiveThermometerEncoder(Encoder):
             q = (res_max + res_min) // 2
             result = pd.qcut(X.ravel(), q=q, duplicates="drop")
             size = len(result.categories)
-            print(f"q: {q}, size: {size}, min: {res_min}, max: {res_max}")
+            logging.info(f"q: {q}, size: {size}, min: {res_min}, max: {res_max}")
 
             if size == self.resolution:
                 self.quantiles = [x.right for x in result.categories]
