@@ -137,10 +137,12 @@ class DistributiveThermometerEncoder(Encoder):
         self.resolution = resolution
         self.quantiles = []
         self.encoding = {
-            bucket: np.array(
-                int_to_binary_list((2**bucket) - 1, size=self.resolution)
-            ).astype(np.uint8)
-            for bucket in range(self.resolution + 1)
+            i: ("0"*(resolution-i)).ljust(resolution, "1")
+            for i in range(resolution+1)
+        }
+        self.encoding = {
+            k: np.array([int(i) for i in v], dtype=np.uint8)
+            for k, v in self.encoding.items()
         }
 
     def fit(self, X, y=None):
@@ -152,7 +154,7 @@ class DistributiveThermometerEncoder(Encoder):
             q = (res_max + res_min) // 2
             result = pd.qcut(X.ravel(), q=q, duplicates="drop")
             size = len(result.categories)
-            # print(f"q: {q}, size: {size}, min: {res_min}, max: {res_max}")
+            print(f"q: {q}, size: {size}, min: {res_min}, max: {res_max}")
 
             if size == self.resolution:
                 self.quantiles = [x.right for x in result.categories]
@@ -172,6 +174,11 @@ class DistributiveThermometerEncoder(Encoder):
         raise ValueError("Could not find split")
 
     def encode(self, X):
+        # inds = np.digitize(X.ravel(), self.quantiles, right=False)
+        # coded_x = [
+        #     np.expand_dims(self.encoding[i], axis=1).astype(np.uint8) for i in inds
+        # ]
+        # return np.hstack(coded_x).ravel()
         inds = np.digitize(X.ravel(), self.quantiles, right=False)
         coded_x = [
             np.expand_dims(self.encoding[i], axis=1).astype(np.uint8) for i in inds
