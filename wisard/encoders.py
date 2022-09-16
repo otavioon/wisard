@@ -133,6 +133,43 @@ class CircularThermometerEncoder(Encoder, Decoder):
             [self.decode(pattern[..., i]) for i in range(pattern.shape[-1])])
 
 
+class ThermometerEncoder2(Encoder):
+    def __init__(self, resolution: int):
+        self.resolution = resolution
+        self.quantiles = []
+        self.encoding = {
+            i: ("0"*(resolution-i)).ljust(resolution, "1")
+            for i in range(resolution+1)
+        }
+        self.encoding = {
+            k: np.array([int(i) for i in v], dtype=np.uint8)
+            for k, v in self.encoding.items()
+        }
+
+    def fit(self, X, y=None):
+        result = pd.cut(X.ravel(), bins=self.resolution)
+        size = len(result.categories)
+
+        if size == self.resolution:
+            self.quantiles = [x.right for x in result.categories]
+            return self
+        else:
+            raise ValueError("Could not find split")
+
+    def encode(self, X):
+        # inds = np.digitize(X.ravel(), self.quantiles, right=False)
+        # coded_x = [
+        #     np.expand_dims(self.encoding[i], axis=1).astype(np.uint8) for i in inds
+        # ]
+        # return np.hstack(coded_x).ravel()
+        inds = np.digitize(X.ravel(), self.quantiles, right=False)
+        coded_x = [
+            np.expand_dims(self.encoding[i], axis=1).astype(np.uint8) for i in inds
+        ]
+        return np.hstack(coded_x).ravel()
+
+    
+    
 class DistributiveThermometerEncoder(Encoder):
     def __init__(self, resolution: int):
         self.resolution = resolution

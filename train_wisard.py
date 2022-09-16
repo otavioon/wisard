@@ -11,7 +11,7 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 
 from wisard.encoders import (
-    ThermometerEncoder,
+    ThermometerEncoder2,
     DistributiveThermometerEncoder,
     encode_dataset,
 )
@@ -23,15 +23,17 @@ from wisard.optimize import find_best_bleach_bayesian, find_best_bleach_bin_sear
 def thermometer_encoder(
     x_train,
     x_test,
-    thermometer_min: float,
-    thermometer_max: float,
     resolution: int,
+    fit_on_train_test: bool = False,
     use_tqdm: bool = False,
 ):
     logging.info("Encoding dataset...")
-    thermometer = ThermometerEncoder(minimum=thermometer_min,
-                                     maximum=thermometer_max,
-                                     resolution=resolution)
+    thermometer = ThermometerEncoder2(resolution=resolution)
+    if fit_on_train_test:
+        x_merged = np.concat([x_train, x_test])
+    else:
+        x_merged = x_train
+    thermometer.fit(x_merged)
     x_train = encode_dataset(thermometer, x_train, use_tqdm=use_tqdm)
     x_test = encode_dataset(thermometer, x_test, use_tqdm=use_tqdm)
     logging.info("Encoding done")
@@ -185,18 +187,18 @@ if __name__ == "__main__":
                          type=int,
                          required=True,
                          help="Thermometer resolution")
-    tparser.add_argument(
-        "--min-val",
-        type=float,
-        required=True,
-        help="Minimum value for encoder (thermometer)",
-    )
-    tparser.add_argument(
-        "--max-val",
-        type=float,
-        required=True,
-        help="Maximum value for encoder (thermometer)",
-    )
+    # tparser.add_argument(
+    #     "--min-val",
+    #     type=float,
+    #     required=True,
+    #     help="Minimum value for encoder (thermometer)",
+    # )
+    # tparser.add_argument(
+    #     "--max-val",
+    #     type=float,
+    #     required=True,
+    #     help="Maximum value for encoder (thermometer)",
+    # )
 
     # The distribuive thermometer
     dtparser = subparsers.add_parser("distributive-thermometer",
@@ -235,8 +237,8 @@ if __name__ == "__main__":
         x_train, x_test = thermometer_encoder(
             x_train,
             x_test,
-            args.min_val,
-            args.max_val,
+            # args.min_val,
+            # args.max_val,
             args.resolution,
             use_tqdm=args.tqdm,
         )
@@ -249,7 +251,7 @@ if __name__ == "__main__":
             x_train,
             x_test,
             args.resolution,
-            fit_on_train_test=args.fit_on_train_test,
+            # fit_on_train_test=args.fit_on_train_test,
             use_tqdm=args.tqdm,
         )
 
