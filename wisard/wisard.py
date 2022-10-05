@@ -9,25 +9,6 @@ from .dict_filter import DictLUT
 from .lut import LUT
 from .bloom_filter import generate_h3_values, BloomFilter
 
-
-# Converts a vector of booleans to an unsigned integer
-#  i.e. (2**0 * xv[0]) + (2**1 * xv[1]) + ... + (2**n * xv[n])
-# Inputs:
-#  xv: The boolean vector to be converted
-# Returns: The unsigned integer representation of xv
-@jit(nopython=True, inline='always')
-def input_to_value(xv: np.ndarray):
-    result = 0
-    for i in range(xv.size):
-        result += xv[i] << i
-    return result
-
-
-@jit(nopython=True, inline='always')
-def int_to_binary_list(value: int, size: int):
-    return [(value >> i) % 2 for i in range(size)]
-
-
 # Implementes a single discriminator in the WiSARD model
 # A discriminator is a collection of boolean LUTs with associated input sets
 # During inference, the outputs of all LUTs are summed to produce a response
@@ -90,9 +71,9 @@ class Discriminator:
     # See the BloomFilter implementation for more information on what this means
     # Inputs:
     #  bleach: The new bleaching value to set
-    def set_bleaching(self, bleach):
+    def set_bleaching(self, bleach, min_bleach):
         for f in self.filters:
-            f.set_bleaching(bleach)
+            f.set_bleaching(bleach, min_bleach)
 
     # Binarizes all filters; this process is irreversible
     # See the BloomFilter implementation for more information on what this means
@@ -210,9 +191,9 @@ class WiSARD:
     # See the BloomFilter implementation for more information on what this means
     # Inputs:
     #  bleach: The new bleaching value to set
-    def set_bleaching(self, bleach):
+    def set_bleaching(self, bleach, min_bleach):
         for d in self.discriminators:
-            d.set_bleaching(bleach)
+            d.set_bleaching(bleach, min_bleach)
 
     # Binarizes all filters; this process is irreversible
     # See the BloomFilter implementation for more information on what this means
@@ -265,8 +246,10 @@ class WiSARD:
                 X: np.ndarray,
                 y: np.ndarray,
                 use_tqdm: bool = True,
-                bleach: int = 1):
-        self.set_bleaching(bleach)
+                bleach: int = 1,
+                min_bleach: int = None):
+        print(f"Setting bleach={bleach}, min_bleach={min_bleach}")
+        self.set_bleaching(bleach, min_bleach)
         if use_tqdm:
             X = tqdm.tqdm(X,
                           desc="Evaluating model",

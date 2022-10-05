@@ -162,6 +162,10 @@ if __name__ == "__main__":
                         type=str,
                         action="store",
                         help="Output file")
+    parser.add_argument("--save-model",
+                        type=str,
+                        action="store",
+                        help="Path to store model")
     parser.add_argument("--linear-index",
                         action="store_true",
                         help="Use linear index for RAMs")
@@ -310,6 +314,14 @@ if __name__ == "__main__":
         with output_path.open("w") as f:
             yaml.dump(config, f)
         logging.info("Saving output done")
+
+    if args.save_model:
+        logging.info("Saving model...")
+        output_path = Path(args.save_model)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("wb") as f:
+            pickle.dump(model, f)
+        logging.info("Saving model done")
 
     print(f"Best bleach: {bleach}")
     print(history)

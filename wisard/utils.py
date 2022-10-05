@@ -1,4 +1,5 @@
 from typing import List
+from numba import jit
 
 import tqdm
 import numpy as np
@@ -37,3 +38,21 @@ def get_random_permutation(size: int):
     permutation = np.arange(np.unpackbits(size))
     permutation = np.random.permutation(permutation)
     return permutation
+
+
+# Converts a vector of booleans to an unsigned integer
+#  i.e. (2**0 * xv[0]) + (2**1 * xv[1]) + ... + (2**n * xv[n])
+# Inputs:
+#  xv: The boolean vector to be converted
+# Returns: The unsigned integer representation of xv
+@jit(nopython=True, inline='always')
+def input_to_value(xv: np.ndarray):
+    result = 0
+    for i in range(xv.size):
+        result += xv[i] << i
+    return result
+
+
+@jit(nopython=True, inline='always')
+def int_to_binary_list(value: int, size: int):
+    return [(value >> i) % 2 for i in range(size)]

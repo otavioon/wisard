@@ -4,3 +4,4 @@ scikit_learn_data/
 !.gitignore
 **/*.pyc
 **/__pycache__
+wisard-experiments/
