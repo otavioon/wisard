@@ -20,7 +20,8 @@ class DictLUT(Filter):
     @jit(nopython=True)
     def __check_membership(xv, bleach, min_bleach, data):
         # address = (xv.astype(np.int64) * 2**np.arange(xv.size)).sum()
-        address = "".join(["0" if x==0 else "1" for x in xv])
+        # address = "".join(["0" if x==0 else "1" for x in xv])
+        address = str(xv[0])
         val = data.get(address, 0)
         min_bleach = min_bleach or val
         return val >= bleach and val <= min_bleach
@@ -29,7 +30,8 @@ class DictLUT(Filter):
     @jit(nopython=True)
     def __add_member(xv, data, inc_val):
         # address = (xv.astype(np.int64) * 2**np.arange(xv.size)).sum()
-        address = "".join(["0" if x==0 else "1" for x in xv])
+        # address = "".join(["0" if x==0 else "1" for x in xv])
+        address = str(xv[0])
         if address not in data:
             data[address] = inc_val
         else:
